@@ -1,0 +1,56 @@
+// models.json
+// Curated list of OpenRouter models, ALL confirmed to support native
+// tool/function calling (PRD §5.2, Decision #1 & #6).
+//
+// This is the data file Appendix A.4 leaves to the build. The sidecar loads it
+// at startup and serves it to the frontend's model dropdown (§5.4). Adding a
+// model = one entry here; no code change.
+//
+// Field notes:
+//   id          - the OpenRouter model slug; stored per-agent as model_config.model_id.
+//   label       - human-readable name for the dropdown.
+//   free        - true if $0 in/out on OpenRouter (the default-recommended tier, §1/§5.2).
+//                 Non-free models are allowed (Decision #6 does NOT hard-restrict) but
+//                 are not the cost-free default.
+//   recommended - the default selection for a new agent. Exactly one is true.
+//   context     - context window in tokens (informational; for the dropdown subtitle).
+//   note        - optional caveat surfaced in the UI / README.
+//
+// base_url and api_key_ref are NOT stored per-model: they are constant for all
+// OpenRouter entries. The sidecar expands a chosen `id` into the stored
+// {base_url, api_key_ref, model_id} shape (Decision #10, A.2.2 note):
+//   base_url    = "https://openrouter.ai/api/v1"
+//   api_key_ref = "openrouter"   (resolves against the api_keys table / config, §5.6)
+
+{
+  "provider_defaults": {
+    "base_url": "https://openrouter.ai/api/v1",
+    "api_key_ref": "openrouter"
+  },
+  "models": [
+    {
+      "id": "poolside/laguna-m.1:free",
+      "label": "Poolside Laguna M.1 (free)",
+      "free": true,
+      "recommended": true,
+      "context": 262144,
+      "note": "Flagship Poolside coding model; native tool calling + reasoning. Solid default."
+    },
+    {
+      "id": "poolside/laguna-xs.2:free",
+      "label": "Poolside Laguna XS.2 (free)",
+      "free": true,
+      "recommended": false,
+      "context": 262144,
+      "note": "Smaller, faster open-weight Poolside model; native tool calling. Good lightweight option."
+    },
+    {
+      "id": "openrouter/owl-alpha",
+      "label": "Owl Alpha",
+      "free": false,
+      "recommended": false,
+      "context": 1048576,
+      "note": "1M-context agentic model (Meituan LongCat-2.0). Supports tool calling, but tool-call reliability has been reported as intermittent and it is no longer free — verify current pricing/stability before relying on it for a demo."
+    }
+  ]
+}
