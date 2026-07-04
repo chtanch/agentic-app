@@ -1,6 +1,6 @@
 # PRD — Windows Agentic Desktop Application
 
-**Version:** v0.91
+**Version:** v0.92
 
 ---
 

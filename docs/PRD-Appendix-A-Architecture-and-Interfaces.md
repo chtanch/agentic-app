@@ -1,7 +1,9 @@
 # Appendix A — Architecture & Interfaces
 
-**Companion to:** PRD — Windows Agentic Desktop Application (v0.91)
+**Companion to:** PRD — Windows Agentic Desktop Application
 **Purpose:** Pin down the three things the PRD leaves implicit but a build needs explicit: (A) the component/data-flow picture, (B) the frontend↔sidecar REST contract, and (C) the agent turn / tool-calling loop. Written so a coding assistant can implement each half against a fixed seam.
+
+**Version:** v0.92
 
 ---
 
@@ -166,6 +168,17 @@ The envelope's two remaining kinds — `not_found` and `bad_request` — are not
 The frontend renders one error component and switches copy on `kind`. `message` is always safe to display (no secrets, no raw stack traces — those go to the DEBUG log per §6.1).
 
 Note that **tool execution failure is *not* in this list.** A failing tool no longer surfaces as an error envelope: recoverable tool failures are returned to the model as a tool-result string and the model responds to the user within an ordinary successful (200) turn; an unexpected tool crash is caught, logged (§6.1), and likewise handed back to the model as a safe string (Appendix B.5). Tool execution failure remains one of the four *logged* failure modes in §6.1, but it is not an enveloped, turn-aborting `kind`.
+
+### A.2.8 Models (curated list)
+
+```
+GET /models
+  → 200 { "models": [ { "id": "poolside/laguna-m.1:free",
+                        "label": "Poolside Laguna M.1 (free)" }, ... ] }
+```
+Feeds the agent editor's model dropdown (PRD §5.4). The sidecar loads the curated model list from a bundled data file at startup (the `models.json` Appendix A.4 leaves to the build — the single source of truth for both this endpoint and `model_id` validation/expansion) and serves **only `{id, label}`** — `id` is the OpenRouter slug submitted back as `model_id` on `POST`/`PUT /agents` (A.2.2), `label` is the display name. Any other fields in the data file (free tier, context window, notes, recommended flag) are reference-only and **not** exposed here; the v1 UI shows the model name only (PRD Non-Goals §3: no custom-model UI). No auth, no side effects; read-only.
+
+This endpoint is additive to the original contract — it crosses the frontend↔sidecar seam like the others, so it's pinned here rather than left to A.4. It exists so the curated list is single-sourced in the sidecar and never duplicated into the frontend bundle.
 
 ---
 

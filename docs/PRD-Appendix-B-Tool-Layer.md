@@ -1,9 +1,11 @@
 # Appendix B — Tool Layer (Registry, Context, and the 6 Tools)
 
-**Companion to:** PRD — Windows Agentic Desktop Application (v0.91) and Appendix A (Architecture & Interfaces).
+**Companion to:** PRD — Windows Agentic Desktop Application and Appendix A (Architecture & Interfaces).
 **Purpose:** Close the one gap Appendix A leaves open (A.4): the concrete `input_schema` for each of the 6 tools, plus the shared `Tool` / `ExecutionContext` types (handlers return a plain `str`) and the registry mechanics. Written so Phase 3 ("tool registry + isolation + the 6 tools") can be built directly against fixed types, with no invented schemas.
 
 This appendix is the authority for the **tool-side** contract. It does not change any REST contract (A.2) or the turn loop (A.3) — it fills in the `registry[call.name].handler(args, ctx)` call site those describe.
+
+**Version:** v0.92
 
 ---
 
