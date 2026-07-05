@@ -1,0 +1,32 @@
+{
+  "provider_defaults": {
+    "base_url": "https://openrouter.ai/api/v1",
+    "api_key_ref": "openrouter"
+  },
+  "models": [
+    {
+      "id": "poolside/laguna-m.1:free",
+      "label": "Poolside Laguna M.1 (free)",
+      "free": true,
+      "recommended": true,
+      "context": 262144,
+      "note": "Flagship Poolside coding model; native tool calling + reasoning. Solid default."
+    },
+    {
+      "id": "poolside/laguna-xs.2:free",
+      "label": "Poolside Laguna XS.2 (free)",
+      "free": true,
+      "recommended": false,
+      "context": 262144,
+      "note": "Smaller, faster open-weight Poolside model; native tool calling. Good lightweight option."
+    },
+    {
+      "id": "openrouter/owl-alpha",
+      "label": "Owl Alpha",
+      "free": false,
+      "recommended": false,
+      "context": 1048576,
+      "note": "1M-context agentic model (Meituan LongCat-2.0). Supports tool calling, but tool-call reliability has been reported as intermittent and it is no longer free — verify current pricing/stability before relying on it for a demo."
+    }
+  ]
+}
