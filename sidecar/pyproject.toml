@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "flask>=3.0",
     "pydantic>=2.6",
+    "requests>=2.31",
 ]
 
 [project.scripts]
@@ -16,6 +17,15 @@ dev = [
     "pytest>=8.0",
     "pyinstaller>=6.0",
 ]
+
+[tool.pytest.ini_options]
+# Live tests hit the real OpenRouter API (network + key + cost + free-tier
+# rate limits) so they're excluded from the default run. Include them with:
+#   uv run pytest -m live
+markers = [
+    "live: exercises the real OpenRouter API; excluded by default",
+]
+addopts = "-m 'not live'"
 
 [build-system]
 requires = ["hatchling"]

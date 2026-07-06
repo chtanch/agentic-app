@@ -1,7 +1,7 @@
 {
   "provider_defaults": {
     "base_url": "https://openrouter.ai/api/v1",
-    "api_key_ref": "openrouter"
+    "api_key_provider": "openrouter"
   },
   "models": [
     {

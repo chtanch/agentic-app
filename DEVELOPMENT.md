@@ -47,6 +47,17 @@ uv run pytest                    # run the test suite
 ```
 Health check: `curl http://127.0.0.1:8765/health` → `{"ok": true}`.
 
+### Frontend in the browser (fastest UI loop, no Rust build)
+For iterating on the React UI against a running sidecar without compiling the
+shell:
+```powershell
+cd sidecar; uv run python -m agent_backend   # terminal 1: sidecar
+npm --prefix frontend run dev                 # terminal 2: Vite at http://localhost:5173
+```
+Open `http://localhost:5173` in a browser. The sidecar's CORS allowlist permits
+`localhost`/`127.0.0.1` (any port) and the Tauri webview origins, so the same
+`fetch`-based API client works in a plain browser and inside the Tauri window.
+
 ### Full app, live (hot-reload webview + Rust shell)
 ```powershell
 npm run tauri -- dev
@@ -116,7 +127,12 @@ Outputs:
 Everything is under `%APPDATA%\agentic-app\`:
 - `app.db` — SQLite (agents, messages, api_keys)
 - `logs\app_YYYYMMDD_HHMMSS.log` — one DEBUG log per run, no auto-cleanup
-- `config.toml` — optional API-key file, read at startup (not required)
+- `config.toml` — optional API-key file, read on each key lookup (not required).
+  Flat keys, config file **wins** over the `api_keys` table (PRD §5.6):
+  ```toml
+  openrouter_key = "sk-or-v1-..."
+  tavily_key     = "tvly-..."
+  ```
 
 Tests and throwaway runs can redirect all of this by setting the
 `AGENT_BACKEND_DATA_DIR` environment variable.

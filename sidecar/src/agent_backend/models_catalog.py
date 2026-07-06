@@ -2,9 +2,9 @@
 
 Loaded once from the bundled `data/models.json`. Single source of truth for
 both the `GET /models` dropdown and `model_id` validation/expansion at agent
-create/edit. The data file names the provider key axis `api_key_ref`; the stored
-model-config shape (§5.5, Decision #10) calls it `api_key_provider`, so we
-normalize on load.
+create/edit. The data file's `provider_defaults` already use the stored
+model-config field names (§5.5, Decision #10) — `base_url`/`api_key_provider` —
+so expansion is a straight copy, no normalization.
 """
 
 from __future__ import annotations
@@ -50,7 +50,6 @@ def expand(model_id: str) -> Optional[dict[str, str]]:
     defaults = _catalog()["provider_defaults"]
     return {
         "base_url": defaults["base_url"],
-        # normalize the data file's `api_key_ref` -> canonical `api_key_provider`
-        "api_key_provider": defaults["api_key_ref"],
+        "api_key_provider": defaults["api_key_provider"],
         "model_id": model_id,
     }

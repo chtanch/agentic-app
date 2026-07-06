@@ -95,6 +95,25 @@ def agent_row_to_api(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+def message_row_to_api(row: sqlite3.Row) -> dict[str, Any]:
+    """Flat `Message` shape for the REST API (Appendix A §A.2.3).
+
+    `tool_calls`/`tool_call_id` are *derived* from the verbatim `message_json`
+    — the UI never sees `reasoning`/`reasoning_details` (server-side replay
+    concern only, A.3.2). `tool_calls` is present on assistant rows that made
+    calls; `tool_call_id` on `tool` rows.
+    """
+    raw = json.loads(row["message_json"]) if row["message_json"] else None
+    return {
+        "id": row["id"],
+        "role": row["role"],
+        "content": row["content"],
+        "tool_calls": raw.get("tool_calls") if raw else None,
+        "tool_call_id": raw.get("tool_call_id") if raw else None,
+        "created_at": row["created_at"],
+    }
+
+
 # --- agent CRUD ----------------------------------------------------------
 
 def list_agents() -> list[dict[str, Any]]:
@@ -187,3 +206,99 @@ def delete_agent(agent_id: int) -> bool:
     with get_conn() as conn:
         cur = conn.execute("DELETE FROM agents WHERE id = ?", (agent_id,))
         return cur.rowcount > 0
+
+
+def load_agent(agent_id: int) -> Optional[dict[str, Any]]:
+    """Internal (server-side) agent view used by the turn loop.
+
+    Unlike `get_agent` (the collapsed API shape), this exposes the full parsed
+    `model_config` — `base_url`/`api_key_provider`/`model_id` — that the turn
+    loop needs to reach OpenRouter. Never crosses the REST seam.
+    """
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM agents WHERE id = ?", (agent_id,)
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "description": row["description"],
+        "model_config": json.loads(row["model_config_json"]),
+        "tools": json.loads(row["tools_json"]),
+        "workspace_folder": row["workspace_folder"],
+    }
+
+
+# --- messages ------------------------------------------------------------
+
+def add_message(
+    agent_id: int,
+    *,
+    role: str,
+    content: Optional[str],
+    message_json: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """Append a message row and return its API shape.
+
+    `message_json` (the FULL raw provider message) is stored verbatim for
+    assistant/tool rows so the turn loop can replay it unmodified (PRD §5.5);
+    plain `user` rows pass `None` and rely on `content` alone.
+    """
+    created_at = _now()
+    payload = json.dumps(message_json) if message_json is not None else None
+    with get_conn() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO messages (agent_id, role, content, message_json, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (agent_id, role, content, payload, created_at),
+        )
+        row = conn.execute(
+            "SELECT * FROM messages WHERE id = ?", (cur.lastrowid,)
+        ).fetchone()
+    return message_row_to_api(row)
+
+
+def get_message_rows(agent_id: int) -> list[sqlite3.Row]:
+    """Raw message rows (chronological). The turn loop needs `message_json`."""
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM messages WHERE agent_id = ? ORDER BY id",
+            (agent_id,),
+        ).fetchall()
+
+
+def list_messages(agent_id: int) -> list[dict[str, Any]]:
+    """API-shaped message list for `GET /agents/{id}/messages` (A.2.3)."""
+    return [message_row_to_api(r) for r in get_message_rows(agent_id)]
+
+
+def clear_messages(agent_id: int) -> None:
+    """Delete an agent's messages, leaving the agent intact (A.2.5 / §5.4)."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM messages WHERE agent_id = ?", (agent_id,))
+
+
+# --- api keys ------------------------------------------------------------
+
+def get_api_key(provider: str) -> Optional[str]:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT key FROM api_keys WHERE provider = ?", (provider,)
+        ).fetchone()
+    return row["key"] if row else None
+
+
+def set_api_key(provider: str, key: str) -> None:
+    """Upsert a plaintext provider key (PRD §5.5; plaintext disclosed in README)."""
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO api_keys (provider, key) VALUES (?, ?)
+            ON CONFLICT(provider) DO UPDATE SET key = excluded.key
+            """,
+            (provider, key),
+        )

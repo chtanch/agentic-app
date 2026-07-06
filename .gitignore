@@ -15,3 +15,6 @@ src-tauri/binaries/*.exe
 
 # Python
 .pytest_cache/
+
+# Editor
+.obsidian/

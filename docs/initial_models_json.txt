@@ -16,16 +16,16 @@
 //   context     - context window in tokens (informational; for the dropdown subtitle).
 //   note        - optional caveat surfaced in the UI / README.
 //
-// base_url and api_key_ref are NOT stored per-model: they are constant for all
-// OpenRouter entries. The sidecar expands a chosen `id` into the stored
-// {base_url, api_key_ref, model_id} shape (Decision #10, A.2.2 note):
-//   base_url    = "https://openrouter.ai/api/v1"
-//   api_key_ref = "openrouter"   (resolves against the api_keys table / config, §5.6)
+// base_url and api_key_provider are NOT stored per-model: they are constant for
+// all OpenRouter entries. The sidecar expands a chosen `id` into the stored
+// {base_url, api_key_provider, model_id} shape (Decision #10, A.2.2 note):
+//   base_url         = "https://openrouter.ai/api/v1"
+//   api_key_provider = "openrouter"   (resolves against the api_keys table / config, §5.6)
 
 {
   "provider_defaults": {
     "base_url": "https://openrouter.ai/api/v1",
-    "api_key_ref": "openrouter"
+    "api_key_provider": "openrouter"
   },
   "models": [
     {
