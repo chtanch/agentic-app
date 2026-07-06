@@ -7,6 +7,10 @@ dependencies = [
     "flask>=3.0",
     "pydantic>=2.6",
     "requests>=2.31",
+    # Windows ships no system IANA tz database; the current_datetime tool
+    # (Appendix B §B.3.2) needs one for `zoneinfo.ZoneInfo(...)`. Bundled into
+    # the PyInstaller build too (build/agent-backend.spec).
+    "tzdata>=2024.1",
 ]
 
 [project.scripts]

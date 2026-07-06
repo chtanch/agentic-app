@@ -5,10 +5,11 @@ the §A.3.2 pseudocode: persist-as-you-go, rebuild the provider messages array b
 replaying `message_json` VERBATIM (reasoning included, in original order), and a
 `while` loop with a max-iterations guard.
 
-**Phase 2 scope:** single agent, non-streaming chat, *no tools*. The tool
-registry + the Appendix B §B.5 call site land in Phase 3; this phase serializes
-no tools, so the loop resolves in a single round to a final assistant message.
-The multi-round structure is already here so Phase 3 is a pure addition.
+**Phase 3 scope:** the multi-round tool-calling loop is now live. Each round's
+assigned tools are serialized (isolation, G4); tool calls are validated against
+their pydantic model, dispatched through the registry, and their results
+persisted as `tool` rows + replayed verbatim (Appendix B §B.5). Tool failures
+are data (error strings fed back to the model), never turn-aborting envelopes.
 """
 
 from __future__ import annotations
@@ -17,8 +18,12 @@ import json
 import logging
 from typing import Any
 
+from pydantic import ValidationError
+
 from . import db, keys, llm
 from .errors import ApiError
+from .tools import registry
+from .tools.base import ExecutionContext
 
 log = logging.getLogger(__name__)
 
@@ -70,8 +75,11 @@ def handle_turn(agent: dict[str, Any], user_text: str) -> list[dict[str, Any]]:
     messages = load_conversation(agent_id)
 
     # ISOLATION (A.3.1 / G4): only an agent's assigned tools are serialized.
-    # Phase 2 serializes none — tool handlers + registry arrive in Phase 3.
-    tool_defs = None
+    # `serialize_tools([])` -> [], which llm.call_openai_compatible treats as
+    # "no tools" (falsy), so a tool-less agent still resolves in one round.
+    tool_defs = registry.serialize_tools(agent["tools"])
+    # Per-agent sandbox root + correlation id, threaded into every handler (B.5).
+    ctx = ExecutionContext(workspace_folder=agent["workspace_folder"], agent_id=agent_id)
 
     new_rows: list[dict[str, Any]] = [user_row]
     iterations = 0
@@ -113,15 +121,54 @@ def handle_turn(agent: dict[str, Any], user_text: str) -> list[dict[str, Any]]:
         # sees its reasoning + tool_calls unmodified, then execute the tools.
         messages.append(assistant_msg)
 
-        # --- Phase 3 (Appendix B §B.5): for each call, validate arguments,
-        #     dispatch registry[name].handler, persist a `tool` row, append the
-        #     result to `messages`, then `continue`. No tools are serialized in
-        #     Phase 2, so a well-behaved model never reaches here.
-        log.warning(
-            "agent %s requested tool_calls but tools are not enabled yet (Phase 3)",
-            agent_id,
-        )
-        raise ApiError(
-            "model_error",
-            "This agent requested a tool, but tools aren't enabled yet.",
-        )
+        # --- Tool execution (Appendix B §B.5) -------------------------------
+        # For each call: validate arguments, dispatch the handler, persist a
+        # `tool` row, append the result to the replay array. Every path yields a
+        # str fed back to the model — a tool failure is NEVER a turn-aborting
+        # envelope (A.3.3 §2). After the calls, `continue` re-enters the loop so
+        # the model sees the results and may call again (multi-round default).
+        for call in tool_calls:
+            fn = call.get("function") or {}
+            name = fn.get("name")
+            result = _run_tool_call(agent, ctx, name, fn.get("arguments"))
+
+            # A.3.2: the tool result message pairs back to the call via id.
+            tool_msg = {"role": "tool", "tool_call_id": call.get("id"), "content": result}
+            row = db.add_message(agent_id, role="tool", content=result, message_json=tool_msg)
+            new_rows.append(row)
+            messages.append(tool_msg)
+
+        continue  # model sees the tool results, may call again or answer
+
+
+def _run_tool_call(
+    agent: dict[str, Any],
+    ctx: ExecutionContext,
+    name: str | None,
+    arguments: Any,
+) -> str:
+    """Validate + dispatch one tool call, returning the result string (B.5).
+
+    Never raises: a recoverable handler failure comes back as an error string;
+    an unexpected handler raise is caught, logged as a crash (full traceback +
+    correlation context), and replaced with a safe generic string so the turn
+    survives. The raw exception text never reaches the model, only the log.
+    """
+    # ISOLATION defense-in-depth (A.3.3 §3): even though only assigned tools are
+    # serialized, guard against the model hallucinating an unassigned tool name.
+    if name not in agent["tools"]:
+        return "Error: tool not assigned to this agent"
+    tool = registry.get(name)
+    if tool is None:                                 # assigned but unregistered
+        return "Error: tool not assigned to this agent"
+    try:
+        # OpenRouter/OpenAI deliver function.arguments as a JSON-encoded STRING
+        # (or "" / null for zero-arg tools) — parse+validate in one step against
+        # the same model that produced input_schema, so schema == validation.
+        args = tool.args_model.model_validate_json(arguments or "{}")
+        return tool.handler(args, ctx)               # recoverable failures -> strings
+    except ValidationError:
+        return "Error: invalid tool arguments"
+    except Exception:                                # unrecoverable: a genuine bug
+        log.exception("tool crashed", extra={"agent_id": agent["id"], "tool": name})
+        return "Error: the tool failed unexpectedly"

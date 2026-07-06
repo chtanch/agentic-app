@@ -75,6 +75,7 @@ exist before `tauri build`. Rebuild it whenever the Python changes:
 cd sidecar
 uv run pyinstaller --noconfirm --onefile --name agent-backend `
   --paths src --collect-data agent_backend `
+  --collect-data tzdata --hidden-import tzdata `
   --distpath dist --workpath build --specpath build `
   packaging/sidecar_entry.py
 
