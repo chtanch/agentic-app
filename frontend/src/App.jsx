@@ -1,21 +1,25 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Alert, Box, Button, Center, Group, Loader, Modal, Paper, ScrollArea,
-  Select, Stack, Text, TextInput, Textarea, Title,
+  ActionIcon, Box, Button, Center, Group, Loader, Stack, Text, Title, Tooltip,
 } from "@mantine/core";
-import { api, ApiError } from "./api/client.js";
+import { api } from "./api/client.js";
+import AgentEditor from "./components/AgentEditor.jsx";
+import ChatView from "./components/ChatView.jsx";
+import SettingsModal from "./components/SettingsModal.jsx";
 
-// Phase 2: the first real frontend↔sidecar round-trip — single agent,
-// non-streaming chat, no tools. A trivial two-pane UI (agent list + chat) that
-// exercises the whole REST seam end to end. The full agent editor, tool cards
-// and settings view are Phase 4.
+// Phase 4 — the full frontend build-out (PRD §5.4): agent list, agent editor
+// (form + tool checkboxes + workspace), chat view with tool-call cards and
+// "Clear conversation", plus a settings view for API keys. A two-pane shell:
+// the sidebar lists agents; the main pane shows either the chat or the editor.
 
 export default function App() {
   const [ready, setReady] = useState(false); // sidecar health gate
   const [agents, setAgents] = useState([]);
-  const [selectedId, setSelectedId] = useState(null);
   const [models, setModels] = useState([]);
-  const [creating, setCreating] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
+  // Main-pane mode: { type: "chat" } | { type: "new" } | { type: "edit", agent }
+  const [pane, setPane] = useState({ type: "chat" });
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Poll /health until the sidecar has bound its port (A.2.1), then load data.
   useEffect(() => {
@@ -24,11 +28,11 @@ export default function App() {
       try {
         await api.health();
         if (!active) return;
-        setReady(true);
         const [ag, md] = await Promise.all([api.listAgents(), api.models()]);
         if (!active) return;
         setAgents(ag);
         setModels(md);
+        setReady(true);
       } catch {
         if (active) setTimeout(tick, 1000);
       }
@@ -37,18 +41,26 @@ export default function App() {
     return () => { active = false; };
   }, []);
 
-  const refreshAgents = async () => setAgents(await api.listAgents());
+  const refreshAgents = () => api.listAgents().then(setAgents);
 
-  const onCreated = async (agent) => {
-    setCreating(false);
+  const openChat = (id) => { setSelectedId(id); setPane({ type: "chat" }); };
+  const openNew = () => setPane({ type: "new" });
+  const openEdit = async (id) => {
+    const agent = await api.getAgent(id); // full config for the form
+    setSelectedId(id);
+    setPane({ type: "edit", agent });
+  };
+
+  const onSaved = async (agent) => {
     await refreshAgents();
     setSelectedId(agent.id);
+    setPane({ type: "chat" });
   };
 
   const onDeleted = async (id) => {
     await api.deleteAgent(id);
-    if (selectedId === id) setSelectedId(null);
     await refreshAgents();
+    if (selectedId === id) { setSelectedId(null); setPane({ type: "chat" }); }
   };
 
   if (!ready) {
@@ -64,208 +76,90 @@ export default function App() {
 
   return (
     <Group h="100vh" gap={0} align="stretch" wrap="nowrap">
-      <Box w={260} p="md" style={{ borderRight: "1px solid var(--mantine-color-default-border)", overflowY: "auto" }}>
+      <Box
+        w={260} p="md"
+        style={{ borderRight: "1px solid var(--mantine-color-default-border)", display: "flex", flexDirection: "column" }}
+      >
         <Group justify="space-between" mb="sm">
           <Title order={4}>Agents</Title>
-          <Button size="xs" onClick={() => setCreating(true)}>New</Button>
+          <Button size="xs" onClick={openNew}>New</Button>
         </Group>
-        <Stack gap={4}>
+
+        <Stack gap={4} style={{ flex: 1, overflowY: "auto" }}>
           {agents.length === 0 && <Text c="dimmed" size="sm">No agents yet.</Text>}
-          {agents.map((a) => (
-            <Group key={a.id} justify="space-between" wrap="nowrap">
-              <Button
-                variant={a.id === selectedId ? "filled" : "subtle"}
-                size="sm"
-                justify="flex-start"
-                style={{ flex: 1 }}
-                onClick={() => setSelectedId(a.id)}
-              >
-                {a.name}
-              </Button>
-              <Button variant="subtle" color="red" size="compact-sm" onClick={() => onDeleted(a.id)}>✕</Button>
-            </Group>
-          ))}
+          {agents.map((a) => {
+            const active = a.id === selectedId;
+            return (
+              <Group key={a.id} justify="space-between" wrap="nowrap" gap={2}>
+                <Button
+                  variant={active ? "filled" : "subtle"}
+                  size="sm" justify="flex-start"
+                  style={{ flex: 1, minWidth: 0 }}
+                  onClick={() => openChat(a.id)}
+                >
+                  <Text truncate>{a.name}</Text>
+                </Button>
+                <Tooltip label="Edit" withArrow>
+                  <ActionIcon variant="subtle" color="gray" onClick={() => openEdit(a.id)} aria-label="Edit agent">
+                    ✎
+                  </ActionIcon>
+                </Tooltip>
+                <Tooltip label="Delete" withArrow>
+                  <ActionIcon variant="subtle" color="red" onClick={() => onDeleted(a.id)} aria-label="Delete agent">
+                    ✕
+                  </ActionIcon>
+                </Tooltip>
+              </Group>
+            );
+          })}
         </Stack>
+
+        <Button variant="subtle" color="gray" size="xs" mt="sm" onClick={() => setSettingsOpen(true)}>
+          ⚙ Settings
+        </Button>
       </Box>
 
       <Box style={{ flex: 1, minWidth: 0 }}>
-        {selectedId == null
-          ? <Center h="100%"><Text c="dimmed">Select or create an agent to start chatting.</Text></Center>
-          : <ChatView key={selectedId} agentId={selectedId} />}
+        <MainPane
+          pane={pane}
+          models={models}
+          selectedId={selectedId}
+          agents={agents}
+          onSaved={onSaved}
+          onCancel={() => setPane({ type: "chat" })}
+          onEdit={openEdit}
+        />
       </Box>
 
-      <Modal opened={creating} onClose={() => setCreating(false)} title="New agent" centered>
-        <CreateAgentForm models={models} onCreated={onCreated} />
-      </Modal>
+      <SettingsModal opened={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </Group>
   );
 }
 
-function CreateAgentForm({ models, onCreated }) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [modelId, setModelId] = useState(models[0]?.id ?? null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const agent = await api.createAgent({
-        name: name.trim(),
-        description: description.trim(),
-        model_id: modelId,
-        tools: [],            // no tools in Phase 2
-        workspace_folder: null,
-      });
-      await onCreated(agent);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Something went wrong.");
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Stack>
-      <TextInput label="Name" value={name} onChange={(e) => setName(e.currentTarget.value)} required />
-      <Textarea
-        label="System prompt"
-        description="Sent as the agent's system prompt."
-        autosize minRows={2}
-        value={description}
-        onChange={(e) => setDescription(e.currentTarget.value)}
-      />
-      <Select
-        label="Model"
-        data={models.map((m) => ({ value: m.id, label: m.label }))}
-        value={modelId}
-        onChange={setModelId}
-        allowDeselect={false}
-      />
-      {error && <Alert color="red" variant="light">{error}</Alert>}
-      <Button onClick={submit} loading={busy} disabled={!name.trim() || !modelId}>Create</Button>
-    </Stack>
-  );
-}
-
-function ChatView({ agentId }) {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [thinking, setThinking] = useState(false);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const viewport = useRef(null);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    api.listMessages(agentId)
-      .then((m) => { if (active) setMessages(m); })
-      .catch(() => { if (active) setError({ kind: "offline", message: "Couldn't load history." }); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [agentId]);
-
-  useEffect(() => {
-    // Autoscroll to the newest message / the thinking indicator.
-    viewport.current?.scrollTo({ top: viewport.current.scrollHeight, behavior: "smooth" });
-  }, [messages, thinking]);
-
-  const send = async () => {
-    const text = input.trim();
-    if (!text || thinking) return;
-    setInput("");
-    setError(null);
-    // Optimistic user bubble (instant feedback on a slow non-streaming turn).
-    const optimistic = { id: `tmp-${Date.now()}`, role: "user", content: text, _optimistic: true };
-    setMessages((prev) => [...prev, optimistic]);
-    setThinking(true);
-    try {
-      const newRows = await api.sendMessage(agentId, text);
-      // Replace the optimistic bubble with the canonical rows the server
-      // returned (user + assistant), keyed by their real ids (A.2.4).
-      setMessages((prev) => [...prev.filter((m) => !m._optimistic), ...newRows]);
-    } catch (e) {
-      setMessages((prev) => prev.filter((m) => !m._optimistic));
-      setInput(text); // let the user retry without retyping
-      setError(e instanceof ApiError ? e : new ApiError("offline", "Something went wrong."));
-    } finally {
-      setThinking(false);
-    }
-  };
-
-  const clear = async () => {
-    await api.clearMessages(agentId);
-    setMessages([]);
-    setError(null);
-  };
-
-  // `tool` rows are not rendered as their own bubble (A.2.3) — Phase 2 has none.
-  const bubbles = messages.filter((m) => m.role === "user" || m.role === "assistant");
-
-  return (
-    <Stack h="100vh" gap={0}>
-      <Group justify="space-between" p="sm" style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}>
-        <Title order={5}>Chat</Title>
-        <Button size="xs" variant="subtle" color="red" onClick={clear} disabled={messages.length === 0}>
-          Clear conversation
-        </Button>
-      </Group>
-
-      <ScrollArea style={{ flex: 1 }} viewportRef={viewport}>
-        <Stack p="md" gap="sm">
-          {loading && <Center><Loader size="sm" /></Center>}
-          {!loading && bubbles.length === 0 && <Text c="dimmed" ta="center">Say hello to your agent.</Text>}
-          {bubbles.map((m) => <Bubble key={m.id} role={m.role} content={m.content} />)}
-          {thinking && (
-            <Group gap="xs" pl="sm">
-              <Loader size="xs" type="dots" />
-              <Text c="dimmed" size="sm">thinking…</Text>
-            </Group>
-          )}
-          {error && (
-            <Alert color="red" variant="light" title={errorTitle(error.kind)}>{error.message}</Alert>
-          )}
-        </Stack>
-      </ScrollArea>
-
-      <Group p="sm" gap="xs" align="flex-end" style={{ borderTop: "1px solid var(--mantine-color-default-border)" }}>
-        <Textarea
-          style={{ flex: 1 }}
-          placeholder="Type a message…  (Enter to send, Shift+Enter for newline)"
-          autosize minRows={1} maxRows={6}
-          value={input}
-          onChange={(e) => setInput(e.currentTarget.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-          disabled={thinking}
-        />
-        <Button onClick={send} loading={thinking} disabled={!input.trim()}>Send</Button>
-      </Group>
-    </Stack>
-  );
-}
-
-function Bubble({ role, content }) {
-  const isUser = role === "user";
-  return (
-    <Group justify={isUser ? "flex-end" : "flex-start"}>
-      <Paper
-        p="sm" radius="md" withBorder
-        bg={isUser ? "var(--mantine-color-blue-light)" : "var(--mantine-color-default)"}
-        maw="80%"
-      >
-        <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>{(content ?? "").trim()}</Text>
-      </Paper>
-    </Group>
-  );
-}
-
-function errorTitle(kind) {
-  switch (kind) {
-    case "bad_api_key": return "API key problem";
-    case "offline": return "Offline";
-    case "model_error": return "Model error";
-    default: return "Error";
+function MainPane({ pane, models, selectedId, agents, onSaved, onCancel, onEdit }) {
+  if (pane.type === "new") {
+    return <AgentEditor models={models} initial={null} onSaved={onSaved} onCancel={onCancel} />;
   }
+  if (pane.type === "edit") {
+    return (
+      <AgentEditor
+        key={pane.agent.id}
+        models={models}
+        initial={pane.agent}
+        onSaved={onSaved}
+        onCancel={onCancel}
+      />
+    );
+  }
+  if (selectedId == null) {
+    return (
+      <Center h="100%">
+        <Text c="dimmed">Select or create an agent to start chatting.</Text>
+      </Center>
+    );
+  }
+  const name = agents.find((a) => a.id === selectedId)?.name ?? "Chat";
+  return (
+    <ChatView key={selectedId} agentId={selectedId} agentName={name} onEdit={() => onEdit(selectedId)} />
+  );
 }

@@ -24,6 +24,8 @@ fn sidecar_reachable() -> bool {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        // Native folder picker for the agent editor's workspace field (§5.4).
+        .plugin(tauri_plugin_dialog::init())
         .manage(SidecarChild(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![sidecar_reachable])
         .setup(|app| {

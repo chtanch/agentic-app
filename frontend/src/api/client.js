@@ -42,6 +42,7 @@ export const api = {
   listAgents: () => request("GET", "/agents").then((d) => d.agents),
   getAgent: (id) => request("GET", `/agents/${id}`).then((d) => d.agent),
   createAgent: (body) => request("POST", "/agents", body).then((d) => d.agent),
+  updateAgent: (id, body) => request("PUT", `/agents/${id}`, body).then((d) => d.agent),
   deleteAgent: (id) => request("DELETE", `/agents/${id}`),
 
   listMessages: (id) => request("GET", `/agents/${id}/messages`).then((d) => d.messages),
