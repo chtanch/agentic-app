@@ -27,7 +27,10 @@ def test_models_returns_id_and_label_only(client):
     resp = client.get("/models")
     assert resp.status_code == 200
     models = resp.get_json()["models"]
-    assert len(models) == 3
+    # Catalog size is data that legitimately grows; don't couple to an exact
+    # count. What the A.2.8 contract fixes is the shape (id+label only) and that
+    # the known default model is present.
+    assert len(models) >= 1
     for m in models:
         assert set(m.keys()) == {"id", "label"}
     assert any(m["id"] == VALID_MODEL for m in models)

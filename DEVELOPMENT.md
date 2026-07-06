@@ -2,8 +2,9 @@
 
 Developer notes for building and running the Windows Agentic Desktop App. This
 covers the three parts of the stack and, importantly, the **build gotchas** that
-are easy to trip over. (End-user setup / design-decisions README is a later
-deliverable; this is the dev-facing note.)
+are easy to trip over. For end-user setup, usage, and the disclosed
+design-decisions / trade-offs, see **[README.md](README.md)** — this file is the
+dev-facing counterpart.
 
 ## Architecture in one line
 A **Tauri (Rust) shell** spawns a **Python Flask sidecar** (bundled as a
