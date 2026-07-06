@@ -93,6 +93,13 @@ Outputs:
 - App exe: `src-tauri\target\release\agentic-desktop.exe`
 - Installer: `src-tauri\target\release\bundle\nsis\Agentic Desktop_0.1.0_x64-setup.exe`
 
+The NSIS installer is configured `installMode: "currentUser"` (`bundle.windows.nsis`
+in `tauri.conf.json`), so it installs per-user under
+`%LOCALAPPDATA%\Agentic Desktop\` with **no UAC / admin prompt** — appropriate
+for an unsigned local-first app. Bundle metadata (publisher, copyright,
+description) is set in `bundle.*` and surfaces in the installer and the exe's
+file properties.
+
 ## ⚠️ Gotchas (read before debugging a broken build)
 
 1. **Never build the app with bare `cargo build`.** Only the Tauri CLI
