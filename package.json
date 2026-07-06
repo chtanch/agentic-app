@@ -1,0 +1,12 @@
+{
+  "name": "agentic-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tauri shell for the Windows Agentic Desktop App (spawns the Python sidecar).",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

@@ -13,7 +13,7 @@ uv sync                 # create .venv, install deps
 uv run pytest           # run the test suite
 uv run python -m agent_backend   # run the sidecar (Ctrl+C to stop)
 ```
-Health check: `GET http://127.0.0.1:8765/health` → `{"ok": true}`.
+Health check: `curl http://127.0.0.1:8765/health` → `{"ok": true}`.
 
 ## Data locations (Windows)
 Everything is stored under `%APPDATA%\agentic-app\`:

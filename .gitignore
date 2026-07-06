@@ -2,3 +2,16 @@
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Node / frontend
+node_modules/
+frontend/dist/
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+# Bundled sidecar binary is a build artifact copied from sidecar/dist (see README)
+src-tauri/binaries/*.exe
+
+# Python
+.pytest_cache/
