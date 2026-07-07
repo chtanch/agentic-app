@@ -1,7 +1,7 @@
 ## Design decisions & trade-offs
 Major design decisions & trade-offs are disclosed here. Most trade completeness for simplicity or safety under the delivery timeline. 
 
-- **Streaming vs non-streaming response**. Streaming is better for user experience. However, implementation for streaming is more complex and more things could go wrong. In light of a one week deadline and app requirements, a simpler non-streaming option is chosen. Replies arrive all at once after a "thinking…".
+- **Streaming vs non-streaming response**. Streaming is better for user experience. However, implementation for streaming is more complex and increases the likelihood of bugs. In light of a one week deadline and app requirements, a simpler non-streaming option is chosen. Replies arrive all at once after a "thinking…".
 
 - **API and Backend service**: Since non-streaming is chosen, REST is used. Flask is chosen to reduce risk of issues. FastAPI, for example, require special care to work properly with pyinstaller packaging.
 

@@ -15,10 +15,6 @@ uv run python -m agent_backend   # run the sidecar (Ctrl+C to stop)
 ```
 Health check: `curl http://127.0.0.1:8765/health` → `{"ok": true}`.
 
-## Models
-OpenRouter models can be added to the predefined list by updating [models.json](src/agent_backend/data/models.json).
-The only required fields are "id" and "label".
-
 ## Data locations (Windows)
 Everything is stored under `%APPDATA%\agentic-app\`:
 - `app.db` — SQLite (agents, messages, api_keys)

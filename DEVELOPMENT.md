@@ -126,6 +126,10 @@ file properties.
 
 5. **Antivirus warning.** The exe/installer are unsigned, so Antivirus programs might prevent the app from running.
 
+## Models
+OpenRouter models can be added to the predefined list by updating [models.json](src/agent_backend/data/models.json) and restarting the backend.
+The only required fields are "id" and "label".
+
 ## Data & log locations (Windows)
 Everything is under `%APPDATA%\agentic-app\`:
 - `app.db` — SQLite (agents, messages, api_keys)

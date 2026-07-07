@@ -14,7 +14,7 @@ provider (OpenRouter) and, if you enable web search, the search provider
 
 > **Build target:** this is a v1 delivered under a one-week timeline. Several
 > deliberate simplicity/safety trade-offs are documented in
-> [Design decisions & trade-offs](#design-decisions--trade-offs) below — please
+> [Design decisions & trade-offs](DESIGN_DECISIONS) — please
 > read that section before relying on the app.
 
 ---
