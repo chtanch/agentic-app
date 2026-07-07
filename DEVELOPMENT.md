@@ -25,13 +25,14 @@ docs/        PRD + Appendix A (architecture/REST) + Appendix B (tools)
 | [uv](https://docs.astral.sh/uv/) | 0.11+ | Manages Python; pins **3.12** via `sidecar/.python-version`. No separate Python install needed. |
 | Node.js + npm | 24 / 11 | For the frontend and the Tauri CLI. |
 | Rust (cargo, rustc) | 1.96 (min 1.77) | Compiles the Tauri shell. |
+| [VS C++ Build Tools](https://visualstudio.microsoft.com/downloads/) + Windows SDK | VS 2022/2026, Win11 SDK (10.0.26100) | Rust's MSVC toolchain (`x86_64-pc-windows-msvc`) links the shell through these. Install the "Desktop development with C++" workload (or Build Tools for VS). |
 | WebView2 Runtime | any current | Preinstalled on Windows 11. |
 
 The **Tauri CLI** is a project dev-dependency (not global) — installed by the
 root `npm install` below and invoked via `npm run tauri`.
 
 ## One-time setup
-From the repo root `D:\chtan\work\agentic-app`:
+From the repo root:
 ```powershell
 npm install                    # root: Tauri CLI
 npm --prefix frontend install  # frontend: React + Vite
@@ -79,10 +80,12 @@ uv run pyinstaller --noconfirm --onefile --name agent-backend `
   --collect-data tzdata --hidden-import tzdata `
   --distpath dist --workpath build --specpath build `
   packaging/sidecar_entry.py
+```
 
+```powershell
+New-Item -ItemType Directory -Path ..\src-tauri\binaries -Force | Out-Null
 # Stage it with the Rust target-triple suffix (get yours: `rustc --print host-tuple`)
-Copy-Item dist\agent-backend.exe `
-  ..\src-tauri\binaries\agent-backend-x86_64-pc-windows-msvc.exe -Force
+Copy-Item dist\agent-backend.exe ..\src-tauri\binaries\agent-backend-x86_64-pc-windows-msvc.exe -Force
 cd ..
 ```
 
@@ -103,34 +106,25 @@ file properties.
 
 ## ⚠️ Gotchas (read before debugging a broken build)
 
-1. **Never build the app with bare `cargo build`.** Only the Tauri CLI
-   (`npm run tauri -- build` / `dev`) enables the `custom-protocol` feature.
-   A bare `cargo build --release` produces a **dev-mode** binary that loads
-   `devUrl` (`http://localhost:5173`) instead of the embedded frontend — the
-   window then shows **"localhost refused to connect"** even though the sidecar
-   is healthy. Always go through the CLI.
-
-2. **Cold-start delay (~5–8 s) on first launch after a build.** Windows Defender
+1. **Cold-start delay (~5–8 s) on first launch after a build.** Windows Defender
    scans the new exe and PyInstaller one-file self-extracts, so the sidecar
    takes a few seconds to bind 8765. The window may briefly show
    **❌ not reachable**, then flip to **✅ reachable** (it polls every second).
 
-3. **Stage the sidecar binary first** (Build step 1). Missing it makes
+2. **Stage the sidecar binary first** (Build step 1). Missing it makes
    `tauri build` fail with *"binary not found for target."*
 
-4. **One instance at a time.** Port 8765 is hardcoded; a leftover
-   `agent-backend.exe` from a prior run prevents a new sidecar from binding.
+3. **One instance at a time.** Port 8765 for sidecar server is hardcoded; if
+   `agent-backend.exe` is leftover from a prior run, this prevents a new sidecar from binding.
    Kill the stray process first.
 
-5. **Graceful close cleans up; force-kill can orphan.** Closing the window
+4. **Graceful close cleans up; force-kill can orphan.** Closing the window
    (X button) fires the shell's exit handler, which tree-kills the sidecar.
    *End Task* in Task Manager force-terminates the shell so that handler never
    runs — the sidecar can linger. (`--onefile` bootloader + extracted child is
    why two `agent-backend.exe` processes appear while running; that's normal.)
 
-6. **SmartScreen warning.** The exe/installer are unsigned, so Windows
-   SmartScreen shows "unknown publisher" — *More info → Run anyway*. Code
-   signing is out of scope for v1.
+5. **Antivirus warning.** The exe/installer are unsigned, so Antivirus programs might prevent the app from running.
 
 ## Data & log locations (Windows)
 Everything is under `%APPDATA%\agentic-app\`:
